@@ -223,43 +223,37 @@ def checkOne(cfg, verbosity=1, verifysslcert=False, logOnlyChanges=False):
         a.callall("checking [" + str(cfg.info )+ "] ...")
 
     if cfg.type == "ping":  # ping it
-        t = cs.ping(cfg.hostname, verbosity - 1 )
-        if t:  # got result
+        ok = cs.check_ping(cfg.hostname)
+        if ok:
             if verbosity > 3:
                 addlog(cfg.hostname + ' is up!')
         else:
             r = 1
             msg = cfg.hostname + ' is down! '
-            if t== 0.0:
-                msg += "DNS ok."
             if cfg.info:
                 msg += cfg.info
 
     if cfg.type == "http":  # test service
-        r = cs.checkHttp(cfg.hostname, verbosity=verbosity, verifysslcert=verifysslcert)
-        if r == None:
-            msg = cfg.hostname + " server unavailable!"
-            r=1
-        elif r == 0:
+        cs.Cfg.sslv = 1 if verifysslcert else 0
+        ok = cs.check_http(cfg.hostname)
+        if ok:
+            r = 0
             if verbosity > 3:
                 addlog(cfg.hostname + ' is up!')
         else:
-            msg = cfg.hostname + " http-service unavailable! [%i]"%r
+            r = 1
+            msg = cfg.hostname + " http-service unavailable!"
 
     # test tcp
     if cfg.type == "tcp":
-        port = 80
-        # if cfg.hostname[0]=='[':  #seems to be ipv6
-        # else:
-        h = cfg.hostname.rsplit(':', 1)
-        host = h[0]
-        if len(h) > 1:
-            port = int(h[1], 10)
-        r = cs.checkTcpPort(host, port)
-        if r == 0:
+        host_port = cfg.hostname if ":" in cfg.hostname else cfg.hostname + ":80"
+        ok = cs.check_tcp(host_port)
+        if ok:
+            r = 0
             if verbosity > 3:
                 addlog(cfg.hostname + ' is up!')
         else:
+            r = 1
             msg = cfg.hostname + " tcp-port unavailable!"
 
     if r != 0:
@@ -425,10 +419,6 @@ def main():
                   verifysslcert=int(p[1],10)
                 if p[0]=="sockcomport":
                   globs.sockcomport = int(p[1],10)
-                if p[0] == "timeout":
-                    t=verifysslcert=int(p[1],10)
-                    if t:
-                        cs.globs.timeout = t
               except:
                   import traceback
                   errMsg = traceback.format_exc().split('\n')[-2]  # the error reason only
